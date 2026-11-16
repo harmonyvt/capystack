@@ -1,0 +1,229 @@
+#!/usr/bin/env node
+// Turns the capystack template into your app. Plain Node, no dependencies.
+//
+//   ./init <slug> --web-host <host> --api-host <host> --bundle-prefix <com.you> [--display <name>] [--dry-run] [--force]
+//
+//   <slug>            lowercase letters, digits and dashes (my-notes). Becomes the Worker names (<slug>-api, <slug>-web),
+//                     the D1 database name, the URL scheme and the secrets dir ~/.config/<slug>/.
+//   --web-host        the web app's host, behind Cloudflare Access (notes.example.com)
+//   --api-host        the API's host, one subdomain level (notes-api.example.com)
+//   --bundle-prefix   reverse-DNS prefix for the Apple bundle id (com.example); the bundle id is <prefix>.<slug>
+//   --display         what the UI calls the app (default: the slug). Only the copy files and displayName use it.
+//   --dry-run         say what would change, write nothing
+//   --force           run again on a tree that was already renamed (it renames from the current app.config.json)
+//
+// What it does: rewrites the placeholders of docs/CONTRACT.md section 0 in every text file (skips .git, node_modules,
+// build output, binaries), renames files and directories whose names contain Capystack/capystack/CAPYSTACK, updates
+// app.config.json, regenerates the design tokens, and prints the next steps. It refuses to run on a tree that is no
+// longer the template (app.config.json name is not "capystack") unless --force.
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+
+const ROOT = __dirname;
+const TEMPLATE_SLUG = "capystack"; // the template's own name; this file is never rewritten, so it stays true.
+const SKIP_DIRS = new Set([".git", "node_modules", ".svelte-kit", ".wrangler", ".cf", "dist", "build", ".build", "DerivedData", "shots"]);
+const SKIP_FILES = new Set(["init", "deploy/test-init.sh"]); // repo-relative, posix
+const BINARY_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".icns", ".pdf", ".woff", ".woff2", ".ttf", ".otf", ".zip", ".gz", ".p8", ".ipa", ".pkg", ".car", ".mp4", ".mov", ".wasm", ".sqlite", ".db"]);
+
+function die(msg) { console.error(`init: ${msg}`); process.exit(1); }
+
+// ---- args ----------------------------------------------------------------------------------------
+const argv = process.argv.slice(2);
+if (argv.includes("-h") || argv.includes("--help") || argv.length === 0) {
+  const head = fs.readFileSync(__filename, "utf8").split("\n").slice(1, 18).map((l) => l.replace(/^\/\/ ?/, ""));
+  console.log(head.join("\n"));
+  process.exit(argv.length === 0 ? 2 : 0);
+}
+const opts = { dryRun: false, force: false };
+let slug = "";
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  const val = () => { if (i + 1 >= argv.length) die(`${a} needs a value`); return argv[++i]; };
+  if (a === "--web-host") opts.webHost = val();
+  else if (a === "--api-host") opts.apiHost = val();
+  else if (a === "--bundle-prefix") opts.bundlePrefix = val();
+  else if (a === "--display") opts.display = val();
+  else if (a === "--dry-run") opts.dryRun = true;
+  else if (a === "--force") opts.force = true;
+  else if (a.startsWith("-")) die(`unknown option ${a} (see --help)`);
+  else if (!slug) slug = a;
+  else die(`unexpected argument ${a}`);
+}
+if (!slug) die("missing <slug>");
+if (!opts.webHost || !opts.apiHost || !opts.bundlePrefix) die("--web-host, --api-host and --bundle-prefix are required");
+if (!/^[a-z][a-z0-9-]{1,29}[a-z0-9]$/.test(slug)) die("slug: lowercase letters, digits, dashes; 3 to 31 characters; start with a letter");
+const HOST = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
+if (!HOST.test(opts.webHost)) die(`--web-host "${opts.webHost}" is not a hostname`);
+if (!HOST.test(opts.apiHost)) die(`--api-host "${opts.apiHost}" is not a hostname`);
+if (opts.webHost === opts.apiHost) die("--web-host and --api-host must differ");
+if (!/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/.test(opts.bundlePrefix)) die(`--bundle-prefix "${opts.bundlePrefix}" is not reverse-DNS (com.example)`);
+
+const pascal = (s) => s.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+const upper = (s) => s.toUpperCase().replace(/-/g, "_");
+
+// ---- old and new values --------------------------------------------------------------------------
+const configPath = path.join(ROOT, "app.config.json");
+if (!fs.existsSync(configPath)) die("app.config.json is missing");
+const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const alreadyRenamed = cfg.name !== TEMPLATE_SLUG;
+if (alreadyRenamed && !opts.force) {
+  die(`this tree is already "${cfg.name}" (app.config.json). Nothing was changed. Use --force to rename it again.`);
+}
+const old = {
+  slug: cfg.name, swift: cfg.swiftName, upper: upper(cfg.name),
+  webHost: cfg.webHost, apiHost: cfg.apiHost, bundleId: cfg.bundleId, appGroup: cfg.appGroup,
+};
+for (const [k, v] of Object.entries(old)) if (!v) die(`app.config.json has no value for ${k}`);
+
+const next = {
+  slug, swift: pascal(slug), upper: upper(slug),
+  webHost: opts.webHost, apiHost: opts.apiHost,
+  bundleId: `${opts.bundlePrefix}.${slug}`, appGroup: `group.${opts.bundlePrefix}.${slug}`,
+};
+const display = opts.display || slug;
+
+// Longest and most specific first: hosts and ids contain the slug.
+const rules = [
+  [old.appGroup, next.appGroup],
+  [old.bundleId, next.bundleId],
+  [old.apiHost, next.apiHost],
+  [old.webHost, next.webHost],
+  [old.swift, next.swift],
+  [old.upper, next.upper],
+  [old.slug, next.slug],
+].filter(([a, b]) => a !== b);
+
+if (rules.length === 0 && !opts.display) {
+  console.log("init: nothing to change, the tree already has these names.");
+  process.exit(0);
+}
+
+// ---- walk ----------------------------------------------------------------------------------------
+const rel = (p) => path.relative(ROOT, p).split(path.sep).join("/");
+function walk(dir, out) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (SKIP_DIRS.has(e.name) || e.name.endsWith(".xcodeproj")) continue;
+      out.dirs.push(full);
+      walk(full, out);
+    } else if (e.isFile()) {
+      out.files.push(full);
+    }
+  }
+  return out;
+}
+const tree = walk(ROOT, { files: [], dirs: [] });
+
+function isText(file) {
+  if (BINARY_EXT.has(path.extname(file).toLowerCase())) return false;
+  const buf = fs.readFileSync(file);
+  return !buf.subarray(0, 8000).includes(0);
+}
+
+function rewrite(text) {
+  let out = text;
+  for (const [a, b] of rules) out = out.split(a).join(b);
+  return out;
+}
+
+// Copy files say the display name where the slug stood as a whole word (not inside a URL, path or identifier).
+function applyDisplay(text) {
+  if (display === next.slug) return text;
+  const re = new RegExp(`(?<![A-Za-z0-9_./:@-])${next.slug}(?![A-Za-z0-9_./:@-])`, "g");
+  return text.replace(re, display);
+}
+const isCopyFile = (file) => /(^|\/)(copy\.ts|Copy\.swift)$/.test(rel(file));
+
+const changedFiles = [];
+for (const file of tree.files) {
+  const r = rel(file);
+  if (SKIP_FILES.has(r) || !isText(file)) continue;
+  const before = fs.readFileSync(file, "utf8");
+  let after = rewrite(before);
+  if (isCopyFile(file)) after = applyDisplay(after);
+  if (after !== before) {
+    changedFiles.push(r);
+    if (!opts.dryRun) fs.writeFileSync(file, after);
+  }
+}
+
+// ---- renames (deepest first so parents still exist) ----------------------------------------------
+const renameName = (name) => {
+  let n = name;
+  for (const [a, b] of [[old.swift, next.swift], [old.upper, next.upper], [old.slug, next.slug]]) {
+    if (a !== b) n = n.split(a).join(b);
+  }
+  return n;
+};
+const entries = [...tree.files.filter((f) => !SKIP_FILES.has(rel(f))), ...tree.dirs]
+  .sort((a, b) => b.split(path.sep).length - a.split(path.sep).length);
+const renamed = [];
+for (const p of entries) {
+  const base = path.basename(p);
+  const nb = renameName(base);
+  if (nb === base) continue;
+  const dest = path.join(path.dirname(p), nb);
+  if (fs.existsSync(dest)) die(`cannot rename ${rel(p)}: ${rel(dest)} already exists`);
+  renamed.push(`${rel(p)} -> ${rel(dest)}`);
+  if (!opts.dryRun) fs.renameSync(p, dest);
+}
+
+// ---- app.config.json is authoritative ------------------------------------------------------------
+if (!opts.dryRun) {
+  const c = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  Object.assign(c, {
+    name: next.slug,
+    displayName: display,
+    swiftName: next.swift,
+    webHost: next.webHost,
+    apiHost: next.apiHost,
+    bundleIdPrefix: opts.bundlePrefix,
+    bundleId: next.bundleId,
+    appGroup: next.appGroup,
+    urlScheme: next.slug,
+    d1Name: next.slug,
+    secretsFile: `~/.config/${next.slug}/secrets.json`,
+  });
+  fs.writeFileSync(configPath, JSON.stringify(c, null, 2) + "\n");
+}
+
+// ---- tokens --------------------------------------------------------------------------------------
+let tokenNote = "";
+if (!opts.dryRun) {
+  const build = path.join(ROOT, "design", "build.mjs");
+  if (fs.existsSync(build)) {
+    const r = spawnSync(process.execPath, [build], { cwd: ROOT, encoding: "utf8" });
+    tokenNote = r.status === 0 ? "design tokens regenerated" : `design tokens FAILED: ${r.stderr || r.stdout}`;
+    if (r.status !== 0) console.error(`init: ${tokenNote}`);
+  }
+}
+
+// ---- report --------------------------------------------------------------------------------------
+console.log(`${opts.dryRun ? "[dry run] would rewrite" : "rewrote"} ${changedFiles.length} files, ${opts.dryRun ? "rename" : "renamed"} ${renamed.length} paths.`);
+for (const r of renamed) console.log(`  rename ${r}`);
+if (tokenNote) console.log(tokenNote);
+if (opts.dryRun) process.exit(0);
+
+console.log(`
+${display} is set up as "${next.slug}":
+  web   https://${next.webHost}   (Cloudflare Access, owner only)
+  api   https://${next.apiHost}
+  app   ${next.bundleId}  (app group ${next.appGroup}, url scheme ${next.slug}://)
+
+Next steps (details: docs/RUNBOOK.md):
+  1. create the D1 database:     cf d1 create ${next.slug}      then put its id into app.config.json ("d1Id")
+  2. DNS and Access:             add ${next.webHost} and ${next.apiHost} to your Cloudflare zone; create an Access
+                                 application for ${next.webHost} (email one-time PIN, your email only); put your email in
+                                 "ownerEmail", your team domain in "accessTeamDomain" and the app's AUD tag in "accessAud"
+  3. secrets file:               mkdir -p ~/.config/${next.slug} && chmod 700 ~/.config/${next.slug}
+                                 then create ~/.config/${next.slug}/secrets.json (chmod 600; shape in docs/RUNBOOK.md)
+  4. check everything:           deploy/app-deploy doctor
+  5. deploy, in this order:      deploy/app-deploy migrate && deploy/app-deploy api && deploy/app-deploy web
+  6. Apple (on a Mac):           team id in apple/Config/Local.xcconfig, App Store Connect key, then
+                                 deploy/app-deploy ios testflight --dry-run
+  7. commit the renamed tree:    git add -A && git commit
+`);

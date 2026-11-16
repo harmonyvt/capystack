@@ -1,0 +1,10 @@
+# npm
+node_modules/
+# cf / Wrangler build output (cf deploy, --dry-run)
+.cloudflare/
+.wrangler/
+worker-configuration.d.ts
+dist/
+# local secrets for wrangler dev, never committed
+.dev.vars
+*.log

@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+# One entry point for this app's deploys. Run from anywhere; paths resolve from the repo root.
+#
+# Usage: deploy/app-deploy <target> [options]
+#
+#   doctor             check tools, the secrets file (mode 600, valid JSON, every key present) and app.config.json
+#   migrate [--dry-run]
+#                      apply the D1 migrations in d1/migrations to the REMOTE database (global cf; not npx cf)
+#   api [--dry-run]    deploy the API Worker (cf deploy from api/, secrets uploaded from the secrets file)
+#   web [--dry-run]    build the web app and deploy the web Worker (npm run build, then cf deploy from web/)
+#   ios testflight [--dry-run] [--build <n>] [--commit <ref>]
+#                      archive the iOS app for App Store Connect and upload it to TestFlight (deploy/apple/testflight.sh;
+#                      --dry-run exports a signed ipa and uploads nothing; --commit ships that commit from a worktree)
+#   mac testflight [--dry-run] [--build <n>] [--commit <ref>]
+#                      the same for the sandboxed Mac app (a signed pkg)
+#   mac                build, sign and install the Mac app locally into /Applications (deploy/apple/mac-install.sh)
+#
+# Options for every target: --yes skips the production confirmation (only for runs the owner already approved);
+# --dry-run builds and uploads nothing and never asks. Without --yes a production run asks you to type the
+# operation (for example "deploy api"); anything else aborts. A non-interactive shell without --yes is refused.
+#
+# Config: app.config.json (read with jq). Secrets: $CAPYSTACK_SECRETS, else "secretsFile" from the config
+# (default ~/.config/capystack/secrets.json). Never print or commit the secrets file.
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+CONFIG="$ROOT/app.config.json"
+
+die() { echo "app-deploy: $*" >&2; exit 1; }
+warn() { echo "app-deploy: warning: $*" >&2; }
+usage() { sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing tool: $1"; }
+
+# Keys the secrets file must contain. An empty value turns that feature off (the API reports it in /capabilities),
+# but the key itself must exist or `cf deploy` refuses the declared binding.
+SECRET_KEYS=(ANTHROPIC_API_KEY APNS_KEY_P8 APNS_KEY_ID APNS_TEAM_ID)
+# Keys whose absence of a value only turns a feature off (warn, do not fail).
+OPTIONAL_VALUE_KEYS=(ANTHROPIC_API_KEY APNS_KEY_P8 APNS_KEY_ID APNS_TEAM_ID)
+
+cfg() { jq -r --arg k "$1" '.[$k] // empty' "$CONFIG"; }
+
+load_config() {
+    need jq
+    [ -f "$CONFIG" ] || die "missing $CONFIG"
+    SLUG="$(cfg name)"
+    D1_ID="$(cfg d1Id)"
+    WEB_HOST="$(cfg webHost)"
+    API_HOST="$(cfg apiHost)"
+    SECRETS="${CAPYSTACK_SECRETS:-$(cfg secretsFile)}"
+    SECRETS="${SECRETS:-~/.config/$SLUG/secrets.json}"
+    SECRETS="${SECRETS/#\~/$HOME}"
+    [ -n "$SLUG" ] || die "app.config.json has no \"name\""
+}
+
+file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
+
+# --- parsing shared by the deploy targets ---------------------------------------------------------
+
+DRY=0
+YES=0
+PASS=()
+parse_opts() {
+    DRY=0; YES=0; PASS=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --dry-run) DRY=1 ;;
+            --yes|-y) YES=1 ;;
+            *) PASS+=("$1") ;;
+        esac
+        shift
+    done
+}
+
+# Production gate: the owner types the operation. --dry-run never asks.
+confirm() { # "operation words"
+    local op="$1" answer
+    [ "$DRY" -eq 1 ] && return 0
+    [ "$YES" -eq 1 ] && return 0
+    [ -t 0 ] || die "refusing to run '$op' without a terminal; pass --yes only if the owner already approved it"
+    echo "This is a PRODUCTION operation: $op"
+    printf 'Type "%s" to continue: ' "$op"
+    read -r answer
+    [ "$answer" = "$op" ] || die "aborted"
+}
+
+require_secrets() {
+    [ -f "$SECRETS" ] || die "missing $SECRETS (docs/RUNBOOK.md, secrets file)"
+    local mode
+    mode="$(file_mode "$SECRETS")"
+    [ "$mode" = "600" ] || die "$SECRETS must be chmod 600 (is $mode)"
+    jq -e 'type == "object"' "$SECRETS" >/dev/null 2>&1 || die "$SECRETS is not a flat JSON object"
+    local k
+    for k in "${SECRET_KEYS[@]}"; do
+        jq -e --arg k "$k" 'has($k)' "$SECRETS" >/dev/null || die "$SECRETS has no \"$k\" key (an empty string is fine: it turns the feature off)"
+    done
+}
+
+warn_empty_secrets() {
+    local k v empty=""
+    for k in "${OPTIONAL_VALUE_KEYS[@]}"; do
+        v="$(jq -r --arg k "$k" '.[$k] // ""' "$SECRETS")"
+        [ -z "${v//[[:space:]]/}" ] && empty="$empty $k"
+    done
+    [ -z "$empty" ] || warn "empty in the secrets file:$empty (those features stay off; push empty means Live Activities freeze in the background)"
+}
+
+# --- targets --------------------------------------------------------------------------------------
+
+t_doctor() {
+    local bad=0 warnc=0 k
+    ok() { printf '  ok    %s\n' "$*"; }
+    bad_() { printf '  FAIL  %s\n' "$*"; bad=$((bad + 1)); }
+    warn_() { printf '  warn  %s\n' "$*"; warnc=$((warnc + 1)); }
+
+    echo "tools"
+    for t in jq node npm git; do
+        command -v "$t" >/dev/null 2>&1 && ok "$t" || bad_ "$t is missing"
+    done
+    if command -v cf >/dev/null 2>&1; then ok "cf (global Cloudflare CLI)"; else bad_ "cf is missing (global install; npx cf fails D1 migrations)"; fi
+    command -v docker >/dev/null 2>&1 && ok "docker" || warn_ "docker not found (only needed if the optional container is switched on)"
+    if [ "$(uname -s)" = Darwin ]; then
+        for t in xcodegen xcodebuild plutil codesign; do
+            command -v "$t" >/dev/null 2>&1 && ok "$t" || bad_ "$t is missing (Apple builds)"
+        done
+    else
+        warn_ "not a Mac: Swift builds, TestFlight and mac install only run on a Mac"
+    fi
+
+    echo "config (app.config.json)"
+    if [ -f "$CONFIG" ] && jq -e . "$CONFIG" >/dev/null 2>&1; then
+        ok "app.config.json parses"
+        for k in name displayName swiftName webHost apiHost bundleId appGroup urlScheme ownerEmail d1Name d1Id accessTeamDomain; do
+            [ -n "$(cfg "$k")" ] && ok "$k = $(cfg "$k")" || bad_ "$k is empty"
+        done
+        [ "$(cfg d1Id)" != "00000000-0000-0000-0000-000000000000" ] || warn_ "d1Id is still the placeholder (create the D1 database: docs/RUNBOOK.md)"
+        [ "$(cfg ownerEmail)" != "owner@example.com" ] || warn_ "ownerEmail is still owner@example.com"
+        [ "$(cfg accessTeamDomain)" != "example.cloudflareaccess.com" ] || warn_ "accessTeamDomain is still the placeholder"
+        [ -n "$(cfg accessAud)" ] || warn_ "accessAud is empty (create the Access application, copy its AUD tag)"
+    else
+        bad_ "app.config.json missing or not JSON"
+    fi
+
+    echo "secrets ($SECRETS)"
+    if [ -f "$SECRETS" ]; then
+        local mode
+        mode="$(file_mode "$SECRETS")"
+        [ "$mode" = "600" ] && ok "mode 600" || bad_ "mode is $mode, run: chmod 600 $SECRETS"
+        if jq -e 'type == "object"' "$SECRETS" >/dev/null 2>&1; then
+            ok "valid JSON object"
+            local v
+            for k in "${SECRET_KEYS[@]}"; do
+                if jq -e --arg k "$k" 'has($k)' "$SECRETS" >/dev/null; then
+                    v="$(jq -r --arg k "$k" '.[$k] // ""' "$SECRETS")"
+                    if [ -z "${v//[[:space:]]/}" ]; then warn_ "$k present but empty (feature off)"; else ok "$k set"; fi
+                else
+                    bad_ "$k key missing (add it, an empty string is fine)"
+                fi
+            done
+        else
+            bad_ "not a flat JSON object"
+        fi
+        if git -C "$ROOT" ls-files --error-unmatch "$SECRETS" >/dev/null 2>&1; then bad_ "the secrets file is tracked by git"; fi
+    else
+        bad_ "missing (create it: docs/RUNBOOK.md)"
+    fi
+
+    echo "design tokens"
+    if node "$ROOT/design/build.mjs" --check >/dev/null 2>&1; then ok "tokens up to date"; else bad_ "tokens stale: node design/build.mjs"; fi
+
+    echo
+    if [ "$bad" -gt 0 ]; then echo "doctor: $bad problem(s), $warnc warning(s)"; return 1; fi
+    echo "doctor: all good ($warnc warning(s))"
+}
+
+t_migrate() {
+    parse_opts "$@"
+    [ ${#PASS[@]} -eq 0 ] || die "unknown option: ${PASS[0]}"
+    need cf
+    [ -n "$D1_ID" ] && [ "$D1_ID" != "00000000-0000-0000-0000-000000000000" ] || die "d1Id in app.config.json is the placeholder; create the D1 database first (docs/RUNBOOK.md)"
+    [ -d "$ROOT/d1/migrations" ] || die "no d1/migrations directory"
+    # Use the global cf: the project-pinned copy (npx cf) fails remote applies with 7403.
+    echo "==> migrations not yet applied to $D1_ID"
+    (cd "$ROOT/api" && cf d1 migrations list "$D1_ID" --dir "$ROOT/d1/migrations")
+    [ "$DRY" -eq 1 ] && { echo "dry run: nothing applied"; return 0; }
+    confirm "migrate $SLUG"
+    (cd "$ROOT/api" && cf d1 migrations apply "$D1_ID" --dir "$ROOT/d1/migrations")
+}
+
+cf_deploy() { # dir [nosecrets]
+    # The web Worker declares no secrets: cf uploads EVERY key in --secrets-file as a binding, so it gets none.
+    local dir="$1" dry=() sec=()
+    [ "$DRY" -eq 1 ] && dry=(--dry-run)
+    need cf
+    if [ "${2:-}" != nosecrets ]; then
+        require_secrets
+        warn_empty_secrets
+        sec=(--secrets-file "$SECRETS")
+    fi
+    (cd "$dir" && cf deploy ${sec[@]+"${sec[@]}"} ${dry[@]+"${dry[@]}"})
+}
+
+t_api() {
+    parse_opts "$@"
+    [ ${#PASS[@]} -eq 0 ] || die "unknown option: ${PASS[0]}"
+    need npm
+    confirm "deploy api"
+    [ -d "$ROOT/api/node_modules" ] || (cd "$ROOT/api" && npm ci)
+    node "$ROOT/design/build.mjs" --check >/dev/null || die "design tokens are stale: node design/build.mjs"
+    cf_deploy "$ROOT/api"
+}
+
+t_web() {
+    parse_opts "$@"
+    [ ${#PASS[@]} -eq 0 ] || die "unknown option: ${PASS[0]}"
+    need npm
+    confirm "deploy web"
+    node "$ROOT/design/build.mjs" --check >/dev/null || die "design tokens are stale: node design/build.mjs"
+    [ -d "$ROOT/web/node_modules" ] || (cd "$ROOT/web" && npm ci)
+    # The web build reads the API origin from app.config.json via the web lane's vite config; export it for scripts that need it.
+    export WEB_HOST API_HOST
+    (cd "$ROOT/web" && npm run build)
+    cf_deploy "$ROOT/web/deploy" nosecrets
+}
+
+# Run an apple script. --commit <ref> ships exactly that commit from a temporary worktree, with this checkout's tooling.
+apple_run() { # script args...
+    local script="$1" commit="" args=() sha wt status=0
+    shift
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --commit) [ $# -ge 2 ] || die "--commit needs a ref"; commit="$2"; shift ;;
+            --dry-run) DRY=1; args+=("$1") ;;
+            *) args+=("$1") ;;
+        esac
+        shift
+    done
+    if [ -z "$commit" ]; then
+        "$HERE/apple/$script" ${args[@]+"${args[@]}"}
+        return
+    fi
+    sha="$(git -C "$ROOT" rev-parse --verify "$commit^{commit}")" || die "unknown commit: $commit"
+    wt="$(mktemp -d "${TMPDIR:-/tmp}/$SLUG-rel.XXXXXX")"
+    rmdir "$wt"
+    git -C "$ROOT" worktree add --detach "$wt" "$sha" >/dev/null
+    mkdir -p "$wt/deploy/apple"
+    cp -f "$HERE/apple/$script" "$wt/deploy/apple/$script"
+    echo "==> releasing ${sha:0:12} from a temporary worktree"
+    "$wt/deploy/apple/$script" ${args[@]+"${args[@]}"} || status=$?
+    git -C "$ROOT" worktree remove --force "$wt" || warn "could not remove worktree $wt"
+    return "$status"
+}
+
+t_testflight() { # extra testflight.sh args then user args
+    local extra=() rest=()
+    while [ $# -gt 0 ]; do
+        case "$1" in --mac) extra+=(--mac) ;; *) rest+=("$1") ;; esac
+        shift
+    done
+    parse_opts ${rest[@]+"${rest[@]}"}
+    # --yes is consumed here; the script gets everything else (and --dry-run, which parse_opts also noted).
+    local fwd=()
+    [ "$DRY" -eq 1 ] && fwd+=(--dry-run)
+    fwd+=(${PASS[@]+"${PASS[@]}"})
+    local label="ios"; [ "${extra[0]:-}" = "--mac" ] && label="mac"
+    confirm "testflight $label"
+    apple_run testflight.sh ${extra[@]+"${extra[@]}"} ${fwd[@]+"${fwd[@]}"}
+}
+
+main() {
+    [ $# -ge 1 ] || { usage; exit 2; }
+    local target="$1"
+    shift
+    case "$target" in
+        -h|--help|help) usage; return 0 ;;
+    esac
+    load_config
+    case "$target" in
+        doctor) t_doctor ;;
+        migrate) t_migrate "$@" ;;
+        api) t_api "$@" ;;
+        web) t_web "$@" ;;
+        ios)
+            case "${1:-}" in
+                testflight) shift; t_testflight "$@" ;;
+                *) die "usage: app-deploy ios testflight [--dry-run]" ;;
+            esac
+            ;;
+        mac)
+            case "${1:-}" in
+                testflight) shift; t_testflight --mac "$@" ;;
+                "" | --*) 
+                    parse_opts "$@"
+                    confirm "install mac"
+                    exec "$HERE/apple/mac-install.sh" ${PASS[@]+"${PASS[@]}"} ;;
+                *) die "usage: app-deploy mac [testflight [--dry-run]]" ;;
+            esac
+            ;;
+        *) usage >&2; exit 2 ;;
+    esac
+}
+
+main "$@"

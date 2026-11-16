@@ -1,0 +1,12 @@
+{
+	"extends": "$app/tsconfig",
+	"include": ["src", "test", "*.ts", "*.js"],
+	"exclude": ["src/service-worker"],
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"types": ["$app/types", "@cloudflare/workers-types", "node"],
+		"strict": true,
+		"skipLibCheck": true
+	}
+}

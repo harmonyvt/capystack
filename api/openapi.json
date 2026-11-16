@@ -1,0 +1,2173 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "capystack API",
+    "version": "0.1.0",
+    "description": "Generated from the op registry by api/scripts/gen.mjs. Do not edit."
+  },
+  "servers": [
+    {
+      "url": "https://capystack-api.capybaraharmony.com"
+    }
+  ],
+  "paths": {
+    "/auth/exchange": {
+      "post": {
+        "operationId": "auth.exchange",
+        "summary": "Trade the one-time sign-in code and its PKCE verifier for a device session.",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "verifier": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "device": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "platform": {
+                    "type": "string",
+                    "maxLength": 20
+                  }
+                },
+                "required": [
+                  "code",
+                  "verifier"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "send as Authorization: Bearer <token>; shown once"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-capystack": {
+          "auth": "open",
+          "auth_text": "none",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/auth/keys": {
+      "get": {
+        "operationId": "keys.list",
+        "summary": "The keys for tools.",
+        "tags": [
+          "keys"
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Key"
+                      },
+                      "description": "newest first"
+                    }
+                  },
+                  "required": [
+                    "keys"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "session",
+          "auth_text": "Bearer token of a signed-in device (a key for tools gets 403)",
+          "ai": "hidden"
+        }
+      },
+      "post": {
+        "operationId": "keys.create",
+        "summary": "Make a key for tools; its token is shown once.",
+        "tags": [
+          "keys"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "$ref": "#/components/schemas/Key"
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "shown once; only its hash is kept"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "session",
+          "auth_text": "Bearer token of a signed-in device (a key for tools gets 403)",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/auth/keys/{id}": {
+      "delete": {
+        "operationId": "keys.revoke",
+        "summary": "Revoke a key for tools.",
+        "tags": [
+          "keys"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "session",
+          "auth_text": "Bearer token of a signed-in device (a key for tools gets 403)",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "auth.me",
+        "summary": "The calling session or key.",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/auth/sessions": {
+      "get": {
+        "operationId": "auth.sessions",
+        "summary": "The signed-in devices, the caller's marked current.",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SessionRow"
+                      },
+                      "description": "most recently used first"
+                    }
+                  },
+                  "required": [
+                    "sessions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "session",
+          "auth_text": "Bearer token of a signed-in device (a key for tools gets 403)",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "auth.revoke",
+        "summary": "Sign a device out.",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "session",
+          "auth_text": "Bearer token of a signed-in device (a key for tools gets 403)",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/auth/signout": {
+      "post": {
+        "operationId": "auth.signout",
+        "summary": "Sign the caller out (revokes its own token).",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/capabilities": {
+      "get": {
+        "operationId": "system.capabilities",
+        "summary": "What this server can do: name, version, features and the PostHog project.",
+        "tags": [
+          "system"
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "features": {
+                      "type": "object",
+                      "properties": {
+                        "ai": {
+                          "type": "boolean"
+                        },
+                        "push": {
+                          "type": "boolean"
+                        },
+                        "posthog": {
+                          "type": "boolean"
+                        },
+                        "mcp": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ai",
+                        "push",
+                        "posthog",
+                        "mcp"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "posthog": {
+                      "type": "object",
+                      "properties": {
+                        "host": {
+                          "type": "string"
+                        },
+                        "token": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "host",
+                        "token"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "version",
+                    "features",
+                    "posthog"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-capystack": {
+          "auth": "open",
+          "auth_text": "none",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/chat/threads": {
+      "post": {
+        "operationId": "chat.create",
+        "summary": "Start a chat thread.",
+        "tags": [
+          "chat"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "thread": {
+                      "$ref": "#/components/schemas/ChatThread"
+                    }
+                  },
+                  "required": [
+                    "thread"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      },
+      "get": {
+        "operationId": "chat.list",
+        "summary": "The chat threads, most recently used first.",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "threads": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ChatThread"
+                      },
+                      "description": "most recently used first, at most 100"
+                    }
+                  },
+                  "required": [
+                    "threads"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/chat/threads/{id}": {
+      "get": {
+        "operationId": "chat.get",
+        "summary": "A chat thread and its messages.",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "thread": {
+                      "$ref": "#/components/schemas/ChatThread"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ChatMessage"
+                      },
+                      "description": "oldest first"
+                    }
+                  },
+                  "required": [
+                    "thread",
+                    "messages"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/chat/threads/{id}/messages": {
+      "post": {
+        "operationId": "chat.send",
+        "summary": "Send a message; the model answers, using the notes tools, and the new messages come back.",
+        "tags": [
+          "chat"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "thread": {
+                      "$ref": "#/components/schemas/ChatThread"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ChatMessage"
+                      },
+                      "description": "the new messages, oldest first"
+                    }
+                  },
+                  "required": [
+                    "thread",
+                    "messages"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "operationId": "jobs.get",
+        "summary": "A job's state and progress.",
+        "tags": [
+          "jobs"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/jobs/demo": {
+      "post": {
+        "operationId": "jobs.demo",
+        "summary": "Start the demo job (a Live Activity on the phone).",
+        "tags": [
+          "jobs"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 120
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "summary": "The MCP server (Streamable HTTP, stateless, JSON answers).",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "default": {
+            "description": "the handler's own response"
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      },
+      "get": {
+        "operationId": "mcp.stream",
+        "summary": "405: no server-sent event stream.",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "default": {
+            "description": "the handler's own response"
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-capystack": {
+          "auth": "open",
+          "auth_text": "none",
+          "ai": "hidden"
+        }
+      },
+      "delete": {
+        "operationId": "mcp.end",
+        "summary": "405: no sessions to end.",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "default": {
+            "description": "the handler's own response"
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-capystack": {
+          "auth": "open",
+          "auth_text": "none",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/notes": {
+      "get": {
+        "operationId": "notes.list",
+        "summary": "List the owner's notes, most recently changed first. Pass `before` (the previous answer's `next`) for older ones.",
+        "tags": [
+          "notes"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "description": "1..100, default 50",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "description": "`next` of the previous page",
+              "type": "string",
+              "pattern": "^(\\d{1,16})_([0-9a-f-]{36})$"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Note"
+                      },
+                      "description": "most recently changed first"
+                    },
+                    "next": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "notes",
+                    "next"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "free",
+          "mcp": "notes_list"
+        }
+      },
+      "post": {
+        "operationId": "notes.create",
+        "summary": "Write a new note with a title and a body.",
+        "tags": [
+          "notes"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "the client's own id (offline create); a new one when left out",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "title": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "body": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 100000
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "note": {
+                      "$ref": "#/components/schemas/Note"
+                    }
+                  },
+                  "required": [
+                    "note"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "free",
+          "mcp": "notes_create"
+        }
+      }
+    },
+    "/notes/{id}": {
+      "get": {
+        "operationId": "notes.get",
+        "summary": "Read one note in full by its id.",
+        "tags": [
+          "notes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "note": {
+                      "$ref": "#/components/schemas/Note"
+                    }
+                  },
+                  "required": [
+                    "note"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "free",
+          "mcp": "notes_get"
+        }
+      },
+      "patch": {
+        "operationId": "notes.update",
+        "summary": "Change a note's title and/or body (the fields left out stay).",
+        "tags": [
+          "notes"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 100000
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "note": {
+                      "$ref": "#/components/schemas/Note"
+                    }
+                  },
+                  "required": [
+                    "note"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "free",
+          "mcp": "notes_update"
+        }
+      },
+      "delete": {
+        "operationId": "notes.delete",
+        "summary": "Delete a note for good.",
+        "tags": [
+          "notes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "ask",
+          "mcp": "notes_delete"
+        }
+      }
+    },
+    "/notes/{id}/summarize": {
+      "post": {
+        "operationId": "notes.summarize",
+        "summary": "A one or two sentence summary of a note by the chat model.",
+        "tags": [
+          "notes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/push/tokens": {
+      "post": {
+        "operationId": "push.register",
+        "summary": "Register an APNs device, push-to-start or Live Activity update token.",
+        "tags": [
+          "push"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "device",
+                      "live_start",
+                      "live_update"
+                    ]
+                  },
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[0-9A-Fa-f]{16,400}$"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "ios",
+                      "ipados",
+                      "mac"
+                    ]
+                  },
+                  "env": {
+                    "type": "string",
+                    "enum": [
+                      "sandbox",
+                      "production"
+                    ]
+                  },
+                  "activity_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "kind",
+                  "token",
+                  "platform",
+                  "env"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "$ref": "#/components/schemas/PushToken"
+                    }
+                  },
+                  "required": [
+                    "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/push/tokens/{id}": {
+      "delete": {
+        "operationId": "push.unregister",
+        "summary": "Forget a push token.",
+        "tags": [
+          "push"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    },
+    "/sync": {
+      "get": {
+        "operationId": "sync.pull",
+        "summary": "What changed since a change number (one page of at most 500 changes).",
+        "tags": [
+          "sync"
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "description": "the last page's `next`; 0 or absent for a first load",
+              "type": "string",
+              "pattern": "^\\d{1,16}$"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "since": {
+                      "type": "integer"
+                    },
+                    "next": {
+                      "type": "integer",
+                      "description": "send as `since` next time"
+                    },
+                    "more": {
+                      "type": "boolean",
+                      "description": "another page is waiting: ask again at once"
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Note"
+                      }
+                    },
+                    "gone": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "entity": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "entity",
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "since",
+                    "next",
+                    "more",
+                    "notes",
+                    "gone"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-capystack": {
+          "auth": "key",
+          "auth_text": "Bearer token: a session or a key for tools",
+          "ai": "hidden"
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "additionalProperties": {}
+            },
+            "description": "Anthropic content blocks: text, tool_use, tool_result"
+          },
+          "text": {
+            "type": "string",
+            "description": "the text blocks joined (empty for a tool turn)"
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          }
+        },
+        "required": [
+          "id",
+          "thread_id",
+          "role",
+          "content",
+          "text",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "ChatThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "updated_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "dotted code, e.g. auth.required"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "const": "demo"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "updated_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "progress",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "Key": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "ms since the epoch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "last_used_at"
+        ],
+        "additionalProperties": false
+      },
+      "Note": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "updated_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "PushToken": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "device",
+              "live_start",
+              "live_update"
+            ]
+          },
+          "platform": {
+            "type": "string"
+          },
+          "env": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ]
+          },
+          "activity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "updated_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "platform",
+          "env",
+          "activity_id",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "session",
+              "key"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "device": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "ms since the epoch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "written at most once a day"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "ms since the epoch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "sessions: slides to 90 days after use; keys: null"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "device",
+          "platform",
+          "created_at",
+          "last_used_at",
+          "expires_at"
+        ],
+        "additionalProperties": false
+      },
+      "SessionRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "session",
+              "key"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "device": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "ms since the epoch"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "ms since the epoch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "written at most once a day"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "ms since the epoch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "sessions: slides to 90 days after use; keys: null"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "the caller's own session"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "device",
+          "platform",
+          "created_at",
+          "last_used_at",
+          "expires_at",
+          "current"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

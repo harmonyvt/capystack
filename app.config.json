@@ -1,0 +1,21 @@
+{
+  "name": "capystack",
+  "displayName": "capystack",
+  "swiftName": "Capystack",
+  "webHost": "capystack.capybaraharmony.com",
+  "apiHost": "capystack-api.capybaraharmony.com",
+  "bundleIdPrefix": "com.capybaraharmony",
+  "bundleId": "com.capybaraharmony.capystack",
+  "appGroup": "group.com.capybaraharmony.capystack",
+  "urlScheme": "capystack",
+  "ownerEmail": "owner@example.com",
+  "accessTeamDomain": "example.cloudflareaccess.com",
+  "accessAud": "",
+  "d1Name": "capystack",
+  "d1Id": "00000000-0000-0000-0000-000000000000",
+  "placementRegion": "aws:ap-southeast-2",
+  "posthogHost": "https://us.i.posthog.com",
+  "posthogToken": "",
+  "chatModel": "claude-haiku-5-5",
+  "secretsFile": "~/.config/capystack/secrets.json"
+}

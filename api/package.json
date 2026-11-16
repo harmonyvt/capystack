@@ -1,0 +1,30 @@
+{
+    "name": "capystack-api",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit",
+        "gen": "node scripts/gen.mjs",
+        "gen:check": "node scripts/gen.mjs --check",
+        "widgets": "node scripts/build-widgets.mjs",
+        "widgets:check": "node scripts/build-widgets.mjs --check",
+        "deploy": "cf deploy --secrets-file \"${CAPYSTACK_SECRETS:-$HOME/.config/capystack/secrets.json}\"",
+        "dry-run": "cf deploy --dry-run --secrets-file \"${CAPYSTACK_SECRETS:-$HOME/.config/capystack/secrets.json}\""
+    },
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.135.0",
+        "@modelcontextprotocol/ext-apps": "^2.0.4",
+        "@modelcontextprotocol/server": "^2.4.0",
+        "zod": "^4.6.7"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^5.20260929.1",
+        "@types/node": "^22.20.4",
+        "cf": "1.0.0-beta.5",
+        "esbuild": "0.28.1",
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.2",
+        "wrangler": "^4.143.0"
+    }
+}

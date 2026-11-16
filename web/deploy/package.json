@@ -1,0 +1,8 @@
+{
+  "name": "capystack-web-deploy",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "*"
+  }
+}

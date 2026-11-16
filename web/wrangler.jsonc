@@ -1,0 +1,15 @@
+{
+	// Read ONLY by @sveltejs/adapter-cloudflare at `vite build`: without a `main` + `assets` it builds for Cloudflare
+	// Pages (and puts _worker.js inside the public assets). With them it builds for Workers and writes the server to
+	// `main` and the public files to `assets.directory`, so the Worker code is never uploaded as a static file.
+	// It is NOT used to deploy: `npm run deploy` runs `cf deploy` from ./deploy (cloudflare.config.ts there), which
+	// points at the same two paths. Keep them in step.
+	"name": "capystack-web",
+	"compatibility_date": "2026-09-01",
+	"main": ".svelte-kit/worker/_worker.js",
+	"assets": {
+		"directory": ".svelte-kit/assets",
+		"binding": "ASSETS",
+		"not_found_handling": "404-page"
+	}
+}

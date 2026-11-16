@@ -1,0 +1,68 @@
+/* The notes widget's look. Token names are the design system's (docs/CONTRACT.md section 11: --<group>-<name>); the
+   widget runs inside a host's sandbox where design/tokens.css is not loaded, so each var() carries the light default
+   and the dark defaults are set below. A host that injects the same variables restyles it. */
+:root {
+    --w-bg: var(--color-bg, #f7f6f3);
+    --w-surface: var(--color-surface, #ffffff);
+    --w-raised: var(--color-surface-raised, #ffffff);
+    --w-text: var(--color-text, #1c1b19);
+    --w-muted: var(--color-text-muted, #6b6862);
+    --w-border: var(--color-border, #e4e1da);
+    --w-accent: var(--color-accent, #8a5a2b);
+    --w-accent-text: var(--color-accent-text, #ffffff);
+    color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --w-bg: var(--color-bg, #151413);
+        --w-surface: var(--color-surface, #1e1d1b);
+        --w-raised: var(--color-surface-raised, #282624);
+        --w-text: var(--color-text, #f2f0ec);
+        --w-muted: var(--color-text-muted, #a29e97);
+        --w-border: var(--color-border, #34322f);
+        --w-accent: var(--color-accent, #d8a46c);
+        --w-accent-text: var(--color-accent-text, #1c1b19);
+    }
+}
+:root[data-theme="dark"] {
+    --w-bg: var(--color-bg, #151413);
+    --w-surface: var(--color-surface, #1e1d1b);
+    --w-raised: var(--color-surface-raised, #282624);
+    --w-text: var(--color-text, #f2f0ec);
+    --w-muted: var(--color-text-muted, #a29e97);
+    --w-border: var(--color-border, #34322f);
+    --w-accent: var(--color-accent, #d8a46c);
+    --w-accent-text: var(--color-accent-text, #1c1b19);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body {
+    font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
+    font-size: var(--font-body, 15px);
+    color: var(--w-text);
+}
+.card {
+    background: var(--w-surface);
+    border: 1px solid var(--w-border);
+    border-radius: var(--radius-lg, 20px);
+    padding: var(--space-4, 16px);
+}
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2, 8px); margin-bottom: var(--space-3, 12px); }
+.head h1 { font-size: var(--font-headline, 17px); margin: 0; font-weight: 600; }
+.count { color: var(--w-muted); font-size: var(--font-caption, 12px); }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2, 8px); }
+li {
+    background: var(--w-raised);
+    border: 1px solid var(--w-border);
+    border-radius: var(--radius-md, 12px);
+    padding: var(--space-3, 12px) var(--space-4, 16px);
+    transition: transform var(--motion-fast, 0.15s) ease;
+}
+li:hover { transform: translateY(-1px); }
+.title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line { color: var(--w-muted); margin-top: var(--space-1, 4px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.when { color: var(--w-muted); font-size: var(--font-caption, 12px); margin-top: var(--space-1, 4px); }
+.empty { color: var(--w-muted); text-align: center; padding: var(--space-6, 24px) 0; }
+.skeleton li { height: 64px; background: linear-gradient(90deg, var(--w-raised), var(--w-border), var(--w-raised)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton li { animation: none; } li { transition: none; } }

@@ -1,0 +1,31 @@
+# dependencies and builds
+node_modules/
+.svelte-kit/
+.wrangler/
+.cf/
+dist/
+build/
+web/build/
+.build/
+DerivedData/
+*.xcarchive
+*.ipa
+*.pkg
+
+# generated Xcode project (apple/project.yml is the source)
+apple/*.xcodeproj
+apple/Config/Local.xcconfig
+
+# mockup screenshots (run: node mockups/shoot.mjs)
+mockups/shots/
+
+# secrets never go in git (they live in ~/.config/capystack/)
+secrets.json
+*.p8
+.env
+.env.*
+.dev.vars
+
+# misc
+.DS_Store
+*.log
