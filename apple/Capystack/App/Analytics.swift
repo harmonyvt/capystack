@@ -21,7 +21,7 @@ enum Analytics {
             return
         }
         if !configured {
-            let config = PostHogConfig(apiKey: project.token, host: project.host.absoluteString)
+            let config = PostHogConfig(projectToken: project.token, host: project.host.absoluteString)
             config.captureApplicationLifecycleEvents = true
             // SwiftUI screens are named by hand (`screen`)
             config.captureScreenViews = false
